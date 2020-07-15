@@ -1,4 +1,4 @@
 # EVGAE
 Epitomic Variational Graph Autoencoder
 
-Code will be uploaded soon
+The modules needed to run the code have been dumped in environment.yml file
