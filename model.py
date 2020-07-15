@@ -19,10 +19,6 @@ class Encoder(torch.nn.Module):
         self.conv_mu = GCNConv(2 * out_channels, out_channels, cached=True)
         self.conv_logvar = GCNConv(2 * out_channels, out_channels, cached=True)
 
-        # self.conv1 = GATConv(in_channels, 2 * out_channels)
-        # self.conv_mu = GATConv(2 * out_channels, out_channels)
-        # self.conv_logvar = GATConv(2 * out_channels, out_channels)
-
     def forward(self, x, edge_index):
         x = F.relu(self.conv1(x, edge_index))
 
@@ -50,7 +46,6 @@ class EpitomeVGAE(VGAE):
         if node_decoder:
             self.node_decoder = node_decoder
         else:
-            # self.node_decoder = GCNNet(sizes=[z_dim, 2 * z_dim, x_dim], layer_type=GCNConv, last_layer_activation=nn.Sigmoid, cached=True)
             self.node_decoder = FCNet(sizes=[z_dim, 10 * z_dim, 5 * z_dim, x_dim], last_layer_activation=nn.Sigmoid())
 
         self.z_dim = z_dim
@@ -62,29 +57,13 @@ class EpitomeVGAE(VGAE):
         #                              requires_grad=False)
         # TODO try with a GCN here too!
         self.qy_given_x = FCNet(sizes=([x_dim, z_dim * 2, num_epitomes]), last_layer_activation=nn.Softmax(dim=1))
-        # self.qy_given_x = QyGivenX(x_dim, num_epitomes)
 
-    # def encode(self, *args, **kwargs):
-    #     z = super().encode(*args, **kwargs)
-    #     py = torch.distributions.Categorical(torch.ones(self.epitomes.shape[0])).probs.cuda()
-    #     # (py[None, :, None] * self.epitomes[None, :, :] * z[:, None, :]).sum(1) / (py[None, :, None] * self.epitomes[None, :, :]).sum(1)
-    #     return (py[:, :, None] * self.epitomes[None, :, :] * z[:, None, :]).sum(1)
-    # # may b normalize it? i.e:
-    # # return (qy_given_x[:, :, None] * self.epitomes[None, :, :] * z[:, None, :]).sum(1) / (qy_given_x[:, :, None] * self.epitomes[None, :, :]).sum(1)
-    # # but this simply recovers z
 
     def kl_losses(self, x, edge_index):
         l_kl = -0.5 * (1 + self.__logvar__ - self.__mu__ ** 2 - self.__logvar__.exp())
 
-        # l_kl = torch.distributions.kl_divergence(
-        #     torch.distributions.Normal(self.__mu__[:, None, :], torch.exp(self.__logvar__ / 2)[:, None, :]),
-        #     torch.distributions.Normal(0, self.epitomes[None, :, :])
-        # )
-        # self.__mu__[:, None, :] * (self.epitomes == 1)[None, :, :], torch.exp(self.__logvar__ / 2)[:, None, :] * self.epitomes[None, :, :]
-        # qy_given_x = self.qy_given_x(x, edge_index)
         qy_given_x = self.qy_given_x(x)
         l_kl = (qy_given_x[:, :, None] * self.epitomes[None, :, :] * l_kl[:, None, :]).sum(dim=1)
-        # l_kl = (qy_given_x[:, :, None] * l_kl).sum(dim=1)
         l_q = kl_divergence(Categorical(qy_given_x), Categorical(torch.ones_like(qy_given_x)))
         return l_kl, l_q
 
@@ -97,7 +76,7 @@ class EpitomeVGAE(VGAE):
 
     @staticmethod
     def split_edges(data, val_ratio=0.05, test_ratio=0.1):
-        r"""Splits the edges of a :obj:`torch_geometric.data.Data` object
+        r""" Copied from pytorch 1.4 - Splits the edges of a :obj:`torch_geometric.data.Data` object
         into positve and negative train/val/test edges.
 
         Args:
@@ -157,18 +136,6 @@ class EpitomeVGAE(VGAE):
 
         return data
 
-    # def recon_loss_without_reduction(self, z, x, pos_edge_index, neg_edge_index=None):
-    #     qy_given_x = self.qy_given_x(x)
-    #     pos_loss = []
-    #     for i in range(self.epitomes.shape[0]):
-    #         pos_loss.append(-torch.log(self.decoder(self.epitomes[i] * z, pos_edge_index, sigmoid=True) + 1e-15))
-    #
-    #     # pos_loss = -torch.log(self.decoder(z, pos_edge_index, sigmoid=True) + 1e-15)
-    #     if neg_edge_index is None:
-    #         neg_edge_index = negative_sampling(pos_edge_index, z.size(0))
-    #     neg_loss = -torch.log(1 - self.decoder(z, neg_edge_index, sigmoid=True) + 1e-15)
-    #
-    #     return pos_loss, neg_loss
 
     def recon_loss_without_reduction(self, z, pos_edge_index, neg_edge_index=None):
 
@@ -178,12 +145,3 @@ class EpitomeVGAE(VGAE):
         neg_loss = -torch.log(1 - self.decoder(z, neg_edge_index, sigmoid=True) + 1e-15)
 
         return pos_loss, neg_loss
-
-    # def relative_recon_loss(self, z1, z2, pos_edge_index, neg_edge_index):
-    #     pos_loss1 = -torch.log(self.decoder(z1, pos_edge_index, sigmoid=True) + 1e-15)
-    #     neg_loss1 = -torch.log(1 - self.decoder(z1, neg_edge_index, sigmoid=True) + 1e-15)
-    #
-    #     pos_loss2 = -torch.log(self.decoder(z2, pos_edge_index, sigmoid=True) + 1e-15)
-    #     neg_loss2 = -torch.log(1 - self.decoder(z2, neg_edge_index, sigmoid=True) + 1e-15)
-    #
-    #     relative_pos_loss = F.binary_cross_entropy()
