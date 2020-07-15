@@ -1,4 +1,4 @@
 # EVGAE
 Epitomic Variational Graph Autoencoder
 
-The modules needed to run the code have been dumped in environment.yml file
+The conda environment, used to run the code has been dumped in environment.yml file
